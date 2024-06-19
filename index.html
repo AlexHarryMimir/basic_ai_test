@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>test_network</title>
+    <title>Neural Network Toy</title>
 </head>
 
 <body>
@@ -25,7 +25,7 @@
             <!--color choices for the neron types-->
             <div>Learning Rate</div>
             <div id="lr_text"></div>
-            <input type="range" min="0" max="2000" id="lr">
+            <input type="range" min="1" max="2000" id="lr">
             <div>Mini Batch Size</div>
             <div id="training_set_size_text"></div>
             <input type="range" min="1" max="500" id="training_set_size">
@@ -35,16 +35,31 @@
             <div>Batch Training</div>
             <input type="checkbox" checked id="en_batch_training">
             <div>Activation Function</div>
-            <div style="display: flex;">
+            <div style="display: none;"><!--todo/ when done make flex-->
                 <div>
                     <div>ReLU</div>
                     <input type="checkbox" class="activation_function_options" checked id="en_batch_training">
                 </div>
+                <div style="width:10px"></div>
+                <div>
+                    <div>Leaky ReLU</div>
+                    <input type="checkbox" class="activation_function_options" unchecked id="en_batch_training">
+                </div>
+                <div style="width:10px"></div>
+                <div>
+                    <div>Sigmoid</div>
+                    <input type="checkbox" class="activation_function_options" unchecked id="en_batch_training">
+                </div>
             </div>
         </div>
-        <div class="set_functions" id="input_functions">
+        <div>
+            <button onclick="display_info()">i</button>
+            <div id="functions_info" class="info_box">Define the behavior of the output neurons by writing a simple function in these boxes. To denote a neuron as an imput to a function use {#}. <br>Example:<br>{0}*{1} would set the associated output Neuron to be trained to produce the prodcut of the first and second feature</div>
+
+            <div class="set_functions" id="input_functions">
+            </div>
         </div>
-        <div><canvas id="accuracy_graph" width="600" height="450" style="border: 1px solid black"></canvas></div>
+        <div><canvas id="accuracy_graph" width="600" height="450" style="border: 1px solid black"></canvas><div style="width: 100%; text-align: center;">Accuracy to Training Epochs</div></div>
         
        
         </div>
@@ -149,6 +164,14 @@
         }
         input_function.innerHTML = input_functions_str;
     };
+    function display_info(){
+        let i_box = document.getElementById("functions_info");
+        if (i_box.style.display == "none"){
+            i_box.style.display = "block";
+        } else {
+            i_box.style.display = "none";
+        }
+    }
 
     //create global network data
     var nFeatures;
