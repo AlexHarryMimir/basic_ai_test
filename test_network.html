@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+    <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>test_network</title>
+</head>
+
+<body>
+    <div class="configuration_menu" id="configuration_menu">
+        <div>
+            <div>Number of features</div>
+            <div id="num_feature_text"></div>
+            <input type="range" min="1" max="4" id="feature_slider">
+            <div>Number of Hidden Layers</div>
+            <div id="num_hidden_layers_text"></div>
+            <input type="range" min="1" max="8" id="hidden_layers_slider">
+            <div>Size of Hidden Layers</div>
+            <div id="len_hidden_layers_text"></div>
+            <input type="range" min="1" max="16" id="len_hidden_layers_slider">
+            <div>Number of Output Neurons</div>
+            <div id="num_output_neuron_text"></div>
+            <input type="range" min="1" max="4" id="num_output_neuron_slider">
+            <!--color choices for the neron types-->
+            <div>Learning Rate</div>
+            <div id="lr_text"></div>
+            <input type="range" min="0" max="2000" id="lr">
+            <div>Mini Batch Size</div>
+            <div id="training_set_size_text"></div>
+            <input type="range" min="1" max="500" id="training_set_size">
+            <div>Number of Epochs</div>
+            <div id="num_epochs_text"></div>
+            <input type="range" min="1" max="50" id="num_epochs">
+            <div>Batch Training</div>
+            <input type="checkbox" checked id="en_batch_training">
+            <div>Activation Function</div>
+            <div style="display: flex;">
+                <div>
+                    <div>ReLU</div>
+                    <input type="checkbox" class="activation_function_options" checked id="en_batch_training">
+                </div>
+            </div>
+        </div>
+        <div class="set_functions" id="input_functions">
+        </div>
+        <div><canvas id="accuracy_graph" width="600" height="450" style="border: 1px solid black"></canvas></div>
+        
+       
+        </div>
+        <div class="controls">
+            <button type="button" id="generate_network">Generate Network</button>
+            <button type="button" id="Train_network" onclick="train_network()">Train Network</button>
+            <button type="button" id="run_example" onclick="compute_results()">Compute Result</button><!--todo allow user to input values-->
+            <button type="button" id="randomize_data" onclick="randomize_values()">Randomize</button><!--todo allow user to input values-->
+        </div>
+        <div class="neural_network" id = "neural_network">
+        
+            
+        </div>
+    </div>
+    
+</body>
+<script>
+
+    class input {
+        constructor(activation_text){
+            this.activation = 0.0;
+            this.activation_text = activation_text;
+        }
+        update_text(){
+            this.activation_text.value = String(this.activation);
+        }
+    }
+
+    class neuron {
+        constructor(weight_texts, activation_text, bias_text, error_text){
+            this.weights = new Array(weight_texts.length).fill(0);
+            this.weight_texts = weight_texts;
+            this.activation = 0.0;
+            this.activation_text = activation_text;
+            this.bias = 0.0;
+            this.bias_text = bias_text;
+            this.error = 0.0;
+            this.error_text = error_text;
+            this.batch_weight_error = new Array(weight_texts.length);
+            this.batch_bias_error = 0.0;
+        }
+        calculate_activation(){
+            this.activation = 1.0;
+        }
+        update_text(){
+            for (let i = 0; i < this.weights.length; i++){
+                this.weight_texts[i].innerHTML = String(Math.round(this.weights[i] * 1000) / 1000);
+            }
+            this.bias_text.innerHTML = String(Math.round(this.bias * 1000) / 1000);
+            this.activation_text.innerHTML = String(Math.round(this.activation * 1000)/1000);
+            this.error_text.innerHTML = String(Math.round(this.error*1000)/1000)
+        }
+    }
+    //error = nextLayer error * weight for each neuron assocated with that connection * (1 - my activation)
+    var num_features = document.getElementById("feature_slider")
+    num_features.oninput = function() {
+        document.getElementById("num_feature_text").innerHTML = this.value;
+    }
+    var learning_rate_slider = document.getElementById("lr")
+    learning_rate_slider.oninput = function() {
+        document.getElementById("lr_text").innerHTML = String(this.value/1000);
+        lr = (this.value)/1000;
+    }
+    var num_hidden_layers = document.getElementById("hidden_layers_slider")
+    num_hidden_layers.oninput = function() {
+        document.getElementById("num_hidden_layers_text").innerHTML = this.value;
+    }
+    var size_hidden_layers = document.getElementById("len_hidden_layers_slider")
+    size_hidden_layers.oninput = function() {
+        document.getElementById("len_hidden_layers_text").innerHTML = this.value;
+    }
+    var batch_size = document.getElementById("training_set_size");
+    batch_size.oninput = function() {
+        document.getElementById("training_set_size_text").innerHTML = this.value;
+    }
+    var num_epochs = document.getElementById("num_epochs");
+    num_epochs.oninput = function() {
+        document.getElementById("num_epochs_text").innerHTML = this.value;
+    }
+    var num_output_neurons = document.getElementById("num_output_neuron_slider")
+    var input_function = document.getElementById("input_functions")
+    num_output_neurons.oninput = function() {
+        document.getElementById("num_output_neuron_text").innerHTML = this.value;
+        let input_functions_str = "";
+        for (let i = 0; i < this.value; i++){
+            input_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + (this.value) + "\">\n"
+        }
+        input_function.innerHTML = input_functions_str;
+    }
+    window.onload = function(){
+        document.getElementById("num_feature_text").innerHTML = num_features.value; 
+        document.getElementById("num_hidden_layers_text").innerHTML = num_hidden_layers.value; 
+        document.getElementById("len_hidden_layers_text").innerHTML = size_hidden_layers.value; 
+        document.getElementById("training_set_size_text").innerHTML = batch_size.value; 
+        document.getElementById("lr_text").innerHTML = String(learning_rate_slider.value/1000); 
+        lr = learning_rate_slider.value/1000; 
+        document.getElementById("num_epochs_text").innerHTML = num_epochs.value; 
+        document.getElementById("num_output_neuron_text").innerHTML = num_output_neurons.value; 
+        let input_functions_str = "";
+        for (let i = 0; i < num_output_neurons.value; i++){
+            input_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + (this.value) + "\">\n"
+        }
+        input_function.innerHTML = input_functions_str;
+    };
+
+    //create global network data
+    var nFeatures;
+    var nHiddenLayers;
+    var nSizeHiddenLayers;
+    var nOutputNerons;
+    var features;
+    var hidden;
+    var outputs;
+    var functions;
+    
+    document.getElementById("generate_network").addEventListener("click", function(e){
+        nFeatures = Number(num_features.value);
+        nHiddenLayers = Number(num_hidden_layers.value);
+        nSizeHiddenLayers = Number(size_hidden_layers.value);
+        nOutputNerons = Number(num_output_neurons.value);
+
+        var nn = "<div class=\"feature_layer\" id=\"feature_layer\">";
+        for (let i = 0; i < nFeatures; i++){
+            nn += "<div id=\"f" + i + "\">";
+            nn += "<div class=\"feature_neuron\"><div class=\"activation_text\" style=\"background-color: aqua;\"><input class=\"feature_input\" type=\"text\"></div></div>"
+            nn += "</div>";
+        }
+        nn += "</div>";
+        
+        let canvas_height;
+        //todo choose a better way to pick canvas height
+        if (nSizeHiddenLayers > nFeatures){
+            canvas_height = nSizeHiddenLayers*100;
+        } else {
+            canvas_height = nFeatures*100;
+        }
+        nn += "<canvas id=\"feature_canvas\" width=\"100\" height=\"" + canvas_height +"\">"
+        nn += "</canvas>"
+
+        nn += "<div class=\"hidden_layers\" id=\"hidden_layers\">";
+        for (let i = 0; i < nHiddenLayers; i++){
+            nn += "<div class=\"hidden_layer\" id=\"hidden_layer" + i + "\">";
+            for (let j = 0; j < nSizeHiddenLayers; j++){
+                nn += "<div class=\"neuron\" id=\"h" + i + "n" + j + "\"><div class=\"weights_text\">";
+                if (i == 0){
+                    for (let k = 0; k < nFeatures; k++){
+                        nn += "<div class=\"individual_weight\">0.0</div>";
+                    }
+                } else {
+                    for (let k = 0; k < nSizeHiddenLayers; k++){
+                        nn += "<div class=\"individual_weight\">0.0</div>";
+                    }
+                }
+                nn += "</div><div class=\"activation_text\" style=\"background-color: lightblue;\">0.0</div><div class=\"bias_text\">0.0</div><div class=\"error_text\">0.0</div></div>";
+            }
+            nn += "</div>";
+            if (i < nHiddenLayers-1){
+                nn += "<canvas width=\"100\" class=\"hidden_layer_net\" height=\"" + canvas_height +"\">"
+                nn += "</canvas>"
+            }
+        }
+        nn += "</div>";
+
+        nn += "<canvas id=\"output_canvas\" width=\"100\" height=\"" + (canvas_height) +"\">"
+        nn += "</canvas>"
+
+        nn += "<div class=\"output_layer\" id=\"output_layer\">";
+        for (let i = 0; i < nOutputNerons; i++){
+            nn += "<div id=\"o" + i + "\"><div class=\"output_neuron\"><div class=\"weights_text\">";
+            for (let k = 0; k < nSizeHiddenLayers; k++){
+                nn += "<div class=\"individual_weight\">0.0</div>";
+            }
+            nn += "</div><div class=\"activation_text\" style=\"background-color: darkred; color: wheat;\">0.0</div><div class=\"bias_text\">0.0</div><div class=\"error_text\">0.0</div></div></div>";
+        }
+        nn += "</div>";
+
+        document.getElementById("neural_network").innerHTML = nn;
+        
+        //setup network datastructures
+        let fn = document.getElementsByClassName("feature_neuron");
+        features = []
+        Array.prototype.forEach.call(fn, function(element){
+            features.push(
+                new input(
+                    element.children[0].children[0]
+                )
+            );
+        })
+        let hl = document.getElementsByClassName("hidden_layer");
+        hidden = []
+        Array.prototype.forEach.call(hl, function(element){
+            let current_hln = [];
+            Array.prototype.forEach.call(element.children, function(e){
+                current_hln.push(new neuron(
+                    e.children[0].children, 
+                    e.children[1],
+                    e.children[2],
+                    e.children[3]
+                ))
+            })
+            hidden.push(current_hln);
+        })
+        
+        let on = document.getElementsByClassName("output_neuron");
+        outputs = []
+        Array.prototype.forEach.call(on, function(element){
+            outputs.push(
+                new neuron(
+                    element.children[0].children,
+                    element.children[1], 
+                    element.children[2],
+                    element.children[3]
+                )
+            );
+        })
+
+        functions = [];
+        Array.prototype.forEach.call(document.getElementsByClassName("textbox"), function(element){
+            functions.push(element.value);
+        })
+        //feature[0].activation_text.innerHTML = "hello";
+        
+        var feature_canvas = document.getElementById("feature_canvas").getContext("2d");
+        let feature_spacing = (canvas_height/nFeatures);
+        let feature_offset = (feature_spacing)/2;
+        let hidden_spacing = (canvas_height/nSizeHiddenLayers);
+        let hidden_offset = hidden_spacing/2;
+        for (let i = 0; i < nFeatures; i++){
+            for (let j = 0; j < nSizeHiddenLayers; j++){
+                feature_canvas.moveTo(0, (i*feature_spacing)+feature_offset);
+                feature_canvas.lineTo(100, (j*hidden_spacing)+hidden_offset);
+            }
+        }
+        feature_canvas.stroke();
+        
+        Array.prototype.forEach.call(document.getElementsByClassName("hidden_layer_net"), function(element){
+            var current_layer_net = element.getContext("2d");
+            for (let i = 0; i < nSizeHiddenLayers; i++){
+                for (let j = 0; j < nSizeHiddenLayers; j++){
+                    current_layer_net.moveTo(0, (i*hidden_spacing)+hidden_offset);
+                    current_layer_net.lineTo(100, (j*hidden_spacing)+hidden_offset);
+                }
+            }
+            current_layer_net.stroke();
+        });
+
+        var output_canvas = document.getElementById("output_canvas").getContext("2d");
+        let output_spacing = (canvas_height/nOutputNerons);
+        let output_offset = output_spacing/2;
+        for (let i = 0; i < nSizeHiddenLayers; i++){
+            for (let j = 0; j < nOutputNerons; j++){
+                output_canvas.moveTo(0, (i*hidden_spacing)+hidden_offset);
+                output_canvas.lineTo(100, (j*output_spacing)+output_offset);
+            }
+        }
+        output_canvas.stroke();
+
+        accuracy_record = [];
+    });
+
+    function update_text(){
+        features.forEach(function(element){
+            element.update_text();
+        })
+        hidden.forEach(function(element){
+            element.forEach(function(e){
+                e.update_text();
+            })
+        })
+        outputs.forEach(function(element){
+            element.update_text();
+        })
+        console.log(accuracy_record);
+        var canvas = document.getElementById("accuracy_graph");
+        var canvas_context = canvas.getContext("2d");
+        let delta_x = canvas.width/accuracy_record.length;
+        let delta_y = canvas.height/(Math.sqrt(Math.max(...accuracy_record)));
+        canvas_context.clearRect(0, 0, canvas.width, canvas.height);
+        canvas_context.beginPath();
+        canvas_context.moveTo(0, canvas.height - delta_y*Math.sqrt(accuracy_record[0]));
+        for (let i = 1; i < accuracy_record.length; i++){
+            canvas_context.lineTo(i*delta_x, canvas.height-(delta_y*Math.sqrt(accuracy_record[i])));
+        }
+        canvas_context.stroke();
+
+    }
+
+    var lr = 1;
+    var accuracy_record = [];
+    function train_network(){
+        for (let epoch = 0; epoch < num_epochs.value; epoch++){
+            var epoch_accuracy = 0.0;
+            if (document.getElementById("en_batch_training").checked){
+                for (let i = 0; i < hidden.length; i++){
+                    for (let j = 0; j < hidden[i].length; j++){
+                        for (let k = 0; k < hidden[i][j].batch_weight_error.length; k++){
+                            hidden[i][j].batch_weight_error[k] = 0.0;
+                        }
+                        hidden[i][j].batch_bias_error = 0.0;
+                    }
+                }
+                for (let i = 0; i < outputs.length; i++){
+                    for (let k = 0; k < outputs[i].batch_weight_error.length; k++){
+                        outputs[i].batch_weight_error[k] = 0.0;
+                    }
+                    outputs[i].batch_bias_error = 0.0;
+                }
+
+                for (let batch = 0; batch < batch_size.value; batch++){
+                    Array.prototype.forEach.call(features, function(element){
+                        element.activation = Math.random();
+                    })
+                    inference();
+                    
+                    for (let i = 0; i < hidden.length; i++){
+                        for (let j = 0; j < hidden[i].length; j++){
+                            if (i == 0){
+                                for (let k = 0; k < hidden[i][j].weights.length; k++){
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error)*features[k].activation;
+                                }
+                            } else {
+                                for (let k = 0; k < hidden[i][j].weights.length; k++){
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error)*hidden[i-1][j].activation;
+                                }
+                            }
+                            hidden[i][j].batch_bias_error += hidden[i][j].error;
+                        }
+                    }
+                    let current_epoch = 0.0;
+                    for (let i = 0; i < outputs.length; i++){
+                        for (let k = 0; k < outputs[i].weights.length; k++){
+                            outputs[i].batch_weight_error[k] += (outputs[i].error)*(hidden[hidden.length-1][k].activation);
+                        }
+                        outputs[i].batch_bias_error += outputs[i].error;
+                        current_epoch += outputs[i].error**2;
+                    }
+                    epoch_accuracy += (current_epoch/outputs.length)**2;
+                }
+                accuracy_record.push(epoch_accuracy/batch_size.value);
+                for (let i = 0; i < hidden.length; i++){
+                    for (let j = 0; j < hidden[i].length; j++){
+                        for (let k = 0; k < hidden[i][j].batch_weight_error.length; k++){
+                            hidden[i][j].weights[k] -= lr*hidden[i][j].batch_weight_error[k]/batch_size.value;
+                        }
+                        hidden[i][j].bias -= lr*hidden[i][j].batch_bias_error/batch_size.value;
+                    }
+                }
+                for (let i = 0; i < outputs.length; i++){
+                    for (let k = 0; k < outputs[i].weights.length; k++){
+                        outputs[i].weights[k] -= lr*outputs[i].batch_weight_error[k]/batch_size.value;
+                    }
+                    outputs[i].bias -= lr*outputs[i].batch_bias_error/batch_size.value;
+                }
+            } else {
+                //adjust each weight on each iteration (no batching)
+                for (let batch = 0; batch < batch_size.value; batch++){
+                    Array.prototype.forEach.call(features, function(element){
+                        element.activation = Math.random();
+                    })
+                    inference();
+                    
+                    for (let i = 0; i < hidden.length; i++){
+                        for (let j = 0; j < hidden[i].length; j++){
+                            if (i == 0){
+                                for (let k = 0; k < hidden[i][j].weights.length; k++){
+                                    hidden[i][j].weights[k] -= lr*(hidden[i][j].error)*features[k].activation;
+                                }
+                            } else {
+                                for (let k = 0; k < hidden[i][j].weights.length; k++){
+                                    hidden[i][j].weights[k] -= lr*(hidden[i][j].error)*hidden[i-1][j].activation;
+                                }
+                            }
+                            hidden[i][j].bias -= lr*hidden[i][j].error;
+                        }
+                    }
+                    let current_epoch = 0.0
+                    for (let i = 0; i < outputs.length; i++){
+                        for (let k = 0; k < outputs[i].weights.length; k++){
+                            
+                            outputs[i].weights[k] -= lr*(outputs[i].error)*(hidden[hidden.length-1][k].activation);
+                        }
+                        outputs[i].bias -= lr*outputs[i].error;
+                        current_epoch += outputs[i].error**2;
+                    }
+                    epoch_accuracy += (current_epoch/outputs.length)**2
+                }
+                accuracy_record.push(epoch_accuracy/batch_size.value);
+            }
+        }
+        
+
+        inference();
+        update_text();
+    }
+
+    function compute_results(){
+        Array.prototype.forEach.call(features, function(element){
+            element.activation = Number(element.activation_text.value);
+        })
+        inference();
+        update_text();
+    }
+
+    function randomize(){
+        return Math.random()-Math.round(Math.random());
+    }
+    function randomize_values(){
+
+        Array.prototype.forEach.call(features, function(element){
+            element.activation = Math.random();
+        })
+        Array.prototype.forEach.call(hidden, function(element){
+            Array.prototype.forEach.call(element, function(e){
+                for (let i = 0; i < e.weights.length; i++){
+                    e.weights[i] = randomize();
+                }
+                e.bias = randomize();
+            })
+        })
+        Array.prototype.forEach.call(outputs, function(element){
+            for (let i = 0; i < element.weights.length; i++){
+                element.weights[i] = randomize();
+            }
+            element.bias = randomize();
+        })
+        
+        
+        let current_epoch = 0.0;
+        for (let i = 0; i < 100; i++){
+            Array.prototype.forEach.call(features, function(element){
+                element.activation = Math.random();
+            })
+            inference();
+            let e = 0.0;
+            for (let j = 0; j < outputs.length; j++){
+                e += (outputs[j].error)**2;
+            }
+            current_epoch += (e/outputs.length)**2;
+        }
+        accuracy_record = [current_epoch/100];
+        inference();
+        update_text();
+    }
+    
+    function inference(){
+        
+        for (let i = 0; i < hidden.length; i++){
+            Array.prototype.forEach.call(hidden[i], function(e){
+                e.activation = 0.0;
+                if (i == 0){
+                    //calculate dot product
+                    for (let j = 0; j < features.length; j++){
+                        e.activation += features[j].activation * e.weights[j];
+                    }
+                    e.activation /= hidden[i].length
+                } else {
+                    for (let j = 0; j < hidden[i].length; j++){
+                        e.activation += hidden[i-1][j].activation * e.weights[j]
+                    }
+                    e.activation /= hidden[i].length;
+                }
+                e.activation += e.bias;
+                //ReLU function:
+                if (e.activation < 0){
+                    e.activation = 0.0;
+                }
+            })
+        }
+        Array.prototype.forEach.call(outputs, function(element){
+            element.activation = 0.0;
+            for (let i = 0; i < hidden[hidden.length-1].length; i++){
+                element.activation += hidden[hidden.length-1][i].activation * element.weights[i];
+            }
+            element.activation /= hidden[hidden.length-1].length;
+            element.activation += element.bias;
+            if (element.activation < 0){
+                element.activation = 0;
+            }
+        })
+        compute_loss();
+    }
+
+    function compute_loss(){
+        output_loss = [];
+        for (let i = 0; i < functions.length; i++){
+            outputs[i].error = compute_value(functions[i], outputs[i].activation);
+        }
+        for (let i = hidden.length-1; i >= 0; i--){
+            for (let j = 0; j < hidden[i].length; j++){
+                if (i == hidden.length-1){
+                    hidden[i][j].error = 0.0;
+                    for (let k = 0; k < outputs.length; k++){
+                        hidden[i][j].error += outputs[k].error*outputs[k].weights[j];
+                    }
+                    if (hidden[i][j].activation <= 0){
+                        hidden[i][j].error = 0.0;
+                    }
+                } else {
+                    hidden[i][j].error = 0.0;
+                    for (let k = 0; k < hidden[i+1].length; k++){
+                        hidden[i][j].error += hidden[i+1][k].error*hidden[i+1][k].weights[j];
+                    }
+                    if (hidden[i][j].activation <= 0){
+                        hidden[i][j].error = 0.0;
+                    }
+                }
+            }
+        }
+    }
+
+    function compute_value(f, x){
+        let function_value = "";
+        for (let i = 0; i < f.length; i++){
+            switch(f.charAt(i)){
+                case '{':
+                    let substring_start = i+1;
+                    while (f.charAt(i) != '}'){
+                        i++;
+                    }
+                    function_value = function_value + String(features[Number(f.substring(substring_start, i))].activation);
+                    break;
+                default:
+                    function_value = function_value + f.charAt(i);
+            }
+        }
+        if (function_value.length == 0){
+            return x
+        }
+        return (x - eval(function_value));
+    }
+    
+    
+</script>
+</html>

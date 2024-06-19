@@ -1,0 +1,101 @@
+.configuration_menu{
+    width: max-content;
+    border: solid 1px black;
+    display: flex;
+    padding: 10px;
+}
+
+.controls{
+    display: flex;
+}
+.set_functions{
+    display: flex;
+    flex-direction: column;
+}
+.neural_network{
+    display: flex;
+    flex-direction: row;
+    min-width: 420px;
+    min-height: 420px;
+    border: solid 1px black;
+}
+
+.feature_layer{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    height: fill;
+}
+
+.hidden_layers{
+    display: flex;
+}
+
+.hidden_layer{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    
+}
+
+.output_layer {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    
+}
+
+.neuron {
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+    display: flex;
+    justify-content: space-between;
+    flex-grow: 1;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.feature_input{
+    background-color: lightcyan;
+    border: solid 1px black;
+    
+    border-radius: 10px;
+}
+
+.output_neuron{
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+    display: flex;
+    justify-content: space-between;
+    flex-grow: 1;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.weights_text{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+
+.activation_text{
+    margin-top: auto;
+    margin-bottom: auto;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: space-around;
+    height: 80px;
+    width: 80px;
+    border: 1px black solid;
+    border-radius: 50%;
+}
+.error_text {
+    color: red;
+}
+
+.bias_text{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
