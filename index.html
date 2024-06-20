@@ -159,17 +159,22 @@
             <div style="display: none;"><!--todo/ when done make flex-->
                 <div>
                     <div>ReLU</div>
-                    <input type="checkbox" class="activation_function_options" checked id="en_batch_training">
+                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
                 </div>
                 <div style="width:10px"></div>
                 <div>
                     <div>Leaky ReLU</div>
-                    <input type="checkbox" class="activation_function_options" unchecked id="en_batch_training">
+                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
+                </div>
+                <div style="width:10px"></div>
+                <div>
+                    <div>GELU</div>
+                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
                 </div>
                 <div style="width:10px"></div>
                 <div>
                     <div>Sigmoid</div>
-                    <input type="checkbox" class="activation_function_options" unchecked id="en_batch_training">
+                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
                 </div>
             </div>
         </div>
@@ -180,7 +185,7 @@
                 would set the associated output Neuron to be trained to produce the prodcut of the first and second
                 feature</div>
 
-            <div class="set_functions" id="input_functions">
+            <div class="set_functions" id="output_functions">
             </div>
         </div>
         <div><canvas id="accuracy_graph" width="600" height="450" style="border: 1px solid black"></canvas>
@@ -241,57 +246,136 @@
             this.error_text.innerHTML = String(Math.round(this.error * 1000) / 1000)
         }
     }
-    //error = nextLayer error * weight for each neuron assocated with that connection * (1 - my activation)
-    var num_features = document.getElementById("feature_slider")
-    num_features.oninput = function () {
-        document.getElementById("num_feature_text").innerHTML = this.value;
-    }
-    var learning_rate_slider = document.getElementById("lr")
-    learning_rate_slider.oninput = function () {
-        document.getElementById("lr_text").innerHTML = String(this.value / 1000);
-        lr = (this.value) / 1000;
-    }
-    var num_hidden_layers = document.getElementById("hidden_layers_slider")
-    num_hidden_layers.oninput = function () {
-        document.getElementById("num_hidden_layers_text").innerHTML = this.value;
-    }
-    var size_hidden_layers = document.getElementById("len_hidden_layers_slider")
-    size_hidden_layers.oninput = function () {
-        document.getElementById("len_hidden_layers_text").innerHTML = this.value;
-    }
-    var batch_size = document.getElementById("training_set_size");
-    batch_size.oninput = function () {
-        document.getElementById("training_set_size_text").innerHTML = this.value;
-    }
-    var num_epochs = document.getElementById("num_epochs");
-    num_epochs.oninput = function () {
-        document.getElementById("num_epochs_text").innerHTML = this.value;
-    }
-    var num_output_neurons = document.getElementById("num_output_neuron_slider")
-    var input_function = document.getElementById("input_functions")
-    num_output_neurons.oninput = function () {
-        document.getElementById("num_output_neuron_text").innerHTML = this.value;
-        let input_functions_str = "";
-        for (let i = 0; i < this.value; i++) {
-            input_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + (this.value) + "\">\n"
+    //activation function enumeration
+    const ReLU = 0;
+    const LeakyReLU = 1;
+    const GELU = 2;
+    const Sigmoid = 3;
+    class activation_function_t {
+        constructor(activation_function_i){
+            this.type = activation_function_i
         }
-        input_function.innerHTML = input_functions_str;
+        activation(n){
+            switch (this.type){
+                case ReLU:
+                    n.activation += n.bias
+                    if (n.activation <= 0){
+                        return 0;
+                    }
+                    return n.activation;
+                case LeakyReLU:
+                case GELU:
+                case Sigmoid:
+                default:
+                    return 0;
+            }
+        }
+        derivative_wrt_w(n){
+            switch (this.type){
+                case ReLU:
+                    if (n.activation <= 0){
+                        return 0.0;
+                    }
+                    return 1.0;
+                case LeakyReLU:
+                case GELU:
+                case Sigmoid:
+                default:
+                    return 0;
+            }
+        }
+        derivative_wrt_b(n){
+            switch (this.type){
+                case ReLU:
+                    return 1.0;
+                case LeakyReLU:
+                case GELU:
+                case Sigmoid:
+                default:
+                    return 0;
+            }
+        }
+
+
+    }
+    //global variables
+    var activation_function = new activation_function_t(ReLU); //todo set init on load
+    //network sizes
+    var nFeatures;
+    var nHiddenLayers;
+    var nSizeHiddenLayers;
+    var nOutputNerons;
+    var setupNOutputNeurons;
+    //network objects
+    var features; //array of input class
+    var hidden; //2d array of neurons
+    var outputs; //array of neurons
+    //network behavior elements
+    var functions; //todo don't force regeneration of network to update functions //update when run
+    var lr; //learning rate
+    var batch_size;
+    var num_epochs;
+
+    var error_graph = document.getElementById("accuracy_graph");
+    var error_graph_context = error_graph.getContext("2d");
+
+    var accuracy_record = [];
+    
+    //slider event handling:
+    {
+        //feature slider:
+        document.getElementById("feature_slider").oninput = function () {
+            document.getElementById("num_feature_text").innerHTML = this.value;
+        }
+        document.getElementById("hidden_layers_slider").oninput = function () {
+            document.getElementById("num_hidden_layers_text").innerHTML = this.value;
+        }
+        document.getElementById("len_hidden_layers_slider").oninput = function () {
+            document.getElementById("len_hidden_layers_text").innerHTML = this.value;
+        }
+        document.getElementById("lr").oninput = function () {
+            document.getElementById("lr_text").innerHTML = String(this.value / 1000);
+            lr = (this.value) / 1000;
+        }
+        document.getElementById("num_output_neuron_slider").oninput = function () {
+            document.getElementById("num_output_neuron_text").innerHTML = this.value;
+            setupNOutputNeurons = this.value;
+            let output_functions_str = "";
+            for (let i = 0; i < this.value; i++) {
+                output_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + i + "\">\n"
+            }
+            document.getElementById("output_functions").innerHTML = output_functions_str;
+        }
+        document.getElementById("training_set_size").oninput = function () {
+            document.getElementById("training_set_size_text").innerHTML = this.value;
+            batch_size = this.value
+        }
+        document.getElementById("num_epochs").oninput = function () {
+            document.getElementById("num_epochs_text").innerHTML = this.value;
+            num_epochs = this.value;
+        }
+        
     }
     window.onload = function () {
-        document.getElementById("num_feature_text").innerHTML = num_features.value;
-        document.getElementById("num_hidden_layers_text").innerHTML = num_hidden_layers.value;
-        document.getElementById("len_hidden_layers_text").innerHTML = size_hidden_layers.value;
-        document.getElementById("training_set_size_text").innerHTML = batch_size.value;
-        document.getElementById("lr_text").innerHTML = String(learning_rate_slider.value / 1000);
-        lr = learning_rate_slider.value / 1000;
-        document.getElementById("num_epochs_text").innerHTML = num_epochs.value;
-        document.getElementById("num_output_neuron_text").innerHTML = num_output_neurons.value;
-        let input_functions_str = "";
-        for (let i = 0; i < num_output_neurons.value; i++) {
-            input_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + (this.value) + "\">\n"
+        //onload capture the state of the sliders
+        document.getElementById("num_feature_text").innerHTML = document.getElementById("feature_slider").value;
+        document.getElementById("num_hidden_layers_text").innerHTML = document.getElementById("hidden_layers_slider").value;
+        document.getElementById("len_hidden_layers_text").innerHTML = document.getElementById("len_hidden_layers_slider").value;
+        batch_size = document.getElementById("training_set_size").value;
+        document.getElementById("training_set_size_text").innerHTML = batch_size;
+        lr = document.getElementById("lr").value / 1000;
+        document.getElementById("lr_text").innerHTML = String(lr);
+        num_epochs = document.getElementById("num_epochs").value;
+        document.getElementById("num_epochs_text").innerHTML = String(num_epochs);
+        setupNOutputNeurons = document.getElementById("num_output_neuron_slider").value;
+        document.getElementById("num_output_neuron_text").innerHTML = String(setupNOutputNeurons);
+        let output_functions_str = "";
+        for (let i = 0; i < setupNOutputNeurons; i++) {
+            output_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + i + "\">\n"
         }
-        input_function.innerHTML = input_functions_str;
+        document.getElementById("output_functions").innerHTML = output_functions_str;
     };
+
     function display_info() {
         let i_box = document.getElementById("functions_info");
         if (i_box.style.display == "none") {
@@ -301,22 +385,15 @@
         }
     }
 
-    //create global network data
-    var nFeatures;
-    var nHiddenLayers;
-    var nSizeHiddenLayers;
-    var nOutputNerons;
-    var features;
-    var hidden;
-    var outputs;
-    var functions;
 
     document.getElementById("generate_network").addEventListener("click", function (e) {
-        nFeatures = Number(num_features.value);
-        nHiddenLayers = Number(num_hidden_layers.value);
-        nSizeHiddenLayers = Number(size_hidden_layers.value);
-        nOutputNerons = Number(num_output_neurons.value);
+        //update globals of network status
+        nFeatures = Number(document.getElementById("feature_slider").value);
+        nHiddenLayers = Number(document.getElementById("hidden_layers_slider").value);
+        nSizeHiddenLayers = Number(document.getElementById("len_hidden_layers_slider").value);
+        nOutputNerons = Number(setupNOutputNeurons);
 
+        //create HTML for network display
         var nn = "<div class=\"feature_layer\" id=\"feature_layer\">";
         for (let i = 0; i < nFeatures; i++) {
             nn += "<div id=\"f" + i + "\">";
@@ -327,6 +404,7 @@
 
         let canvas_height;
         //todo choose a better way to pick canvas height
+        //todo label the columns as wights, biases, activations and features
         if (nSizeHiddenLayers > nFeatures) {
             canvas_height = nSizeHiddenLayers * 100;
         } else {
@@ -371,7 +449,7 @@
             nn += "</div><div class=\"activation_text\" style=\"background-color: darkred; color: wheat;\">0.0</div><div class=\"bias_text\">0.0</div><div class=\"error_text\">0.0</div></div></div>";
         }
         nn += "</div>";
-
+        //push update
         document.getElementById("neural_network").innerHTML = nn;
 
         //setup network datastructures
@@ -412,13 +490,8 @@
             );
         })
 
-        functions = [];
-        Array.prototype.forEach.call(document.getElementsByClassName("textbox"), function (element) {
-            functions.push(element.value);
-        })
-        //feature[0].activation_text.innerHTML = "hello";
-
-        var feature_canvas = document.getElementById("feature_canvas").getContext("2d");
+        //draw lines to canvases
+        let feature_canvas = document.getElementById("feature_canvas").getContext("2d");
         let feature_spacing = (canvas_height / nFeatures);
         let feature_offset = (feature_spacing) / 2;
         let hidden_spacing = (canvas_height / nSizeHiddenLayers);
@@ -452,8 +525,6 @@
             }
         }
         output_canvas.stroke();
-
-        accuracy_record = [];
     });
 
     function update_text() {
@@ -468,27 +539,30 @@
         outputs.forEach(function (element) {
             element.update_text();
         })
-        console.log(accuracy_record);
-        var canvas = document.getElementById("accuracy_graph");
-        var canvas_context = canvas.getContext("2d");
-        let delta_x = canvas.width / accuracy_record.length;
-        let delta_y = canvas.height / (Math.sqrt(Math.max(...accuracy_record)));
-        canvas_context.clearRect(0, 0, canvas.width, canvas.height);
-        canvas_context.beginPath();
-        canvas_context.moveTo(0, canvas.height - delta_y * Math.sqrt(accuracy_record[0]));
+        let delta_x = error_graph.width / accuracy_record.length;
+        let delta_y = error_graph.height / (Math.sqrt(Math.max(...accuracy_record)));
+        error_graph_context.clearRect(0, 0, error_graph.width, error_graph.height);
+        error_graph_context.beginPath();
+        error_graph_context.moveTo(0, error_graph.height - delta_y * Math.sqrt(accuracy_record[0]));
         for (let i = 1; i < accuracy_record.length; i++) {
-            canvas_context.lineTo(i * delta_x, canvas.height - (delta_y * Math.sqrt(accuracy_record[i])));
+            error_graph_context.lineTo(i * delta_x, error_graph.height - (delta_y * Math.sqrt(accuracy_record[i])));
         }
-        canvas_context.stroke();
+        error_graph_context.stroke();
 
     }
 
-    var lr = 1;
-    var accuracy_record = [];
     function train_network() {
-        for (let epoch = 0; epoch < num_epochs.value; epoch++) {
+        //capture current functions to train to
+        functions = [];
+        Array.prototype.forEach.call(document.getElementsByClassName("textbox"), function (element) {
+            functions.push(element.value);
+        })
+        //each iteration of an epock pushes a batch worth of update(s)
+        for (let epoch = 0; epoch < num_epochs; epoch++) {
+            //each epock is a point of accuracy on the graph
             var epoch_accuracy = 0.0;
-            if (document.getElementById("en_batch_training").checked) {
+            if (document.getElementById("en_batch_training").checked) { //if batched then an update is only pushed once per batch, if not batched, each iteration is a new update
+                //setup averaging of errors
                 for (let i = 0; i < hidden.length; i++) {
                     for (let j = 0; j < hidden[i].length; j++) {
                         for (let k = 0; k < hidden[i][j].batch_weight_error.length; k++) {
@@ -503,95 +577,78 @@
                     }
                     outputs[i].batch_bias_error = 0.0;
                 }
-
-                for (let batch = 0; batch < batch_size.value; batch++) {
+                //calculate the summ of errors for each iteration in the batch
+                for (let batch = 0; batch < batch_size; batch++) {
+                    //initilize input values and forward propogate the computation of the network (ie inference)
                     Array.prototype.forEach.call(features, function (element) {
                         element.activation = Math.random();
                     })
                     inference();
-
+                    //add error to sum of the batch error
                     for (let i = 0; i < hidden.length; i++) {
                         for (let j = 0; j < hidden[i].length; j++) {
                             if (i == 0) {
                                 for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * features[k].activation;
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * features[k].activation * activation_function.derivative_wrt_w(hidden[i][j]);
                                 }
                             } else {
                                 for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * hidden[i - 1][j].activation;
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * hidden[i - 1][j].activation * activation_function.derivative_wrt_w(hidden[i][j]);
                                 }
                             }
-                            hidden[i][j].batch_bias_error += hidden[i][j].error;
+                            hidden[i][j].batch_bias_error += hidden[i][j].error * activation_function.derivative_wrt_b(hidden[i][j]);
                         }
                     }
+                    //in adition to accululating error calculate the network accuracy in MSE of the training case
                     let current_epoch = 0.0;
                     for (let i = 0; i < outputs.length; i++) {
                         for (let k = 0; k < outputs[i].weights.length; k++) {
-                            outputs[i].batch_weight_error[k] += (outputs[i].error) * (hidden[hidden.length - 1][k].activation);
+                            outputs[i].batch_weight_error[k] += (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * activation_function.derivative_wrt_w(outputs[i]);
                         }
-                        outputs[i].batch_bias_error += outputs[i].error;
+                        outputs[i].batch_bias_error += outputs[i].error * activation_function.derivative_wrt_b(outputs[i]);
                         current_epoch += outputs[i].error ** 2;
                     }
                     epoch_accuracy += (current_epoch / outputs.length) ** 2;
                 }
-                accuracy_record.push(epoch_accuracy / batch_size.value);
-                for (let i = 0; i < hidden.length; i++) {
-                    for (let j = 0; j < hidden[i].length; j++) {
-                        for (let k = 0; k < hidden[i][j].batch_weight_error.length; k++) {
-                            hidden[i][j].weights[k] -= lr * hidden[i][j].batch_weight_error[k] / batch_size.value;
-                        }
-                        hidden[i][j].bias -= lr * hidden[i][j].batch_bias_error / batch_size.value;
-                    }
-                }
-                for (let i = 0; i < outputs.length; i++) {
-                    for (let k = 0; k < outputs[i].weights.length; k++) {
-                        outputs[i].weights[k] -= lr * outputs[i].batch_weight_error[k] / batch_size.value;
-                    }
-                    outputs[i].bias -= lr * outputs[i].batch_bias_error / batch_size.value;
-                }
+                //store MSE of the batch 
+                accuracy_record.push(epoch_accuracy / batch_size);
+
+                //push update of the batch error
+                adjust_network_values(true);
             } else {
                 //adjust each weight on each iteration (no batching)
-                for (let batch = 0; batch < batch_size.value; batch++) {
+                for (let batch = 0; batch < batch_size; batch++) {
+                    //randomize inputs and forward propogate them (ie inference)
                     Array.prototype.forEach.call(features, function (element) {
                         element.activation = Math.random();
                     })
                     inference();
-
-                    for (let i = 0; i < hidden.length; i++) {
-                        for (let j = 0; j < hidden[i].length; j++) {
-                            if (i == 0) {
-                                for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * features[k].activation;
-                                }
-                            } else {
-                                for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * hidden[i - 1][j].activation;
-                                }
-                            }
-                            hidden[i][j].bias -= lr * hidden[i][j].error;
-                        }
-                    }
+                    //collect accuracy data as MSE for case in epoch
                     let current_epoch = 0.0
                     for (let i = 0; i < outputs.length; i++) {
-                        for (let k = 0; k < outputs[i].weights.length; k++) {
-
-                            outputs[i].weights[k] -= lr * (outputs[i].error) * (hidden[hidden.length - 1][k].activation);
-                        }
-                        outputs[i].bias -= lr * outputs[i].error;
                         current_epoch += outputs[i].error ** 2;
                     }
-                    epoch_accuracy += (current_epoch / outputs.length) ** 2
+                    epoch_accuracy += (current_epoch / outputs.length) ** 2;
+                    //adjust values on each iteration
+                    adjust_network_values(false);
                 }
-                accuracy_record.push(epoch_accuracy / batch_size.value);
+
+                //push update to network for the iteration
+                accuracy_record.push(epoch_accuracy / batch_size);
             }
         }
-
-
         inference();
         update_text();
     }
 
+    //inference a single example given by the user
     function compute_results() {
+        //if the functions are updated before computing a result the error will be different
+        functions = [];
+        Array.prototype.forEach.call(document.getElementsByClassName("textbox"), function (element) {
+            functions.push(element.value);
+        })
+        //capture current value of inputs as set by user
         Array.prototype.forEach.call(features, function (element) {
             element.activation = Number(element.activation_text.value);
         })
@@ -599,11 +656,13 @@
         update_text();
     }
 
+    //randomize between 1 and -1
     function randomize() {
         return Math.random() - Math.round(Math.random());
     }
+    //randomize the entire network initial values
     function randomize_values() {
-
+        //Randomize between 0 and 1 for features
         Array.prototype.forEach.call(features, function (element) {
             element.activation = Math.random();
         })
@@ -622,9 +681,14 @@
             element.bias = randomize();
         })
 
-
+        //capture functions before measuring network accuracy
+        functions = [];
+        Array.prototype.forEach.call(document.getElementsByClassName("textbox"), function (element) {
+            functions.push(element.value);
+        })
+        //get an initial network accuracy estimate
         let current_epoch = 0.0;
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < batch_size; i++) {
             Array.prototype.forEach.call(features, function (element) {
                 element.activation = Math.random();
             })
@@ -641,7 +705,7 @@
     }
 
     function inference() {
-
+        //for all hidden layers, update activation based on activation_function(x, b) where x is the weighted sum and b is the bias
         for (let i = 0; i < hidden.length; i++) {
             Array.prototype.forEach.call(hidden[i], function (e) {
                 e.activation = 0.0;
@@ -657,56 +721,47 @@
                     }
                     e.activation /= hidden[i].length;
                 }
-                e.activation += e.bias;
-                //ReLU function:
-                if (e.activation < 0) {
-                    e.activation = 0.0;
-                }
+                e.activation = activation_function.activation(e);
             })
         }
-        Array.prototype.forEach.call(outputs, function (element) {
+        //for all outputs update the activation using the activations of the hidden layer
+        Array.prototype.forEach.call(outputs, function(element) {
             element.activation = 0.0;
             for (let i = 0; i < hidden[hidden.length - 1].length; i++) {
                 element.activation += hidden[hidden.length - 1][i].activation * element.weights[i];
             }
-            element.activation /= hidden[hidden.length - 1].length;
-            element.activation += element.bias;
-            if (element.activation < 0) {
-                element.activation = 0;
-            }
+            element.activation /= outputs.length;
+            element.activation = activation_function.activation(element);
         })
         compute_loss();
     }
 
     function compute_loss() {
-        output_loss = [];
+
         for (let i = 0; i < functions.length; i++) {
-            outputs[i].error = compute_value(functions[i], outputs[i].activation);
+            outputs[i].error = outputs[i].activation - compute_value(functions[i]); //error of output value is simply (y_pred-y)
         }
+        //calculate error for hidden layers
         for (let i = hidden.length - 1; i >= 0; i--) {
             for (let j = 0; j < hidden[i].length; j++) {
+                //if last layer then error is proportional to error of outputs
                 if (i == hidden.length - 1) {
                     hidden[i][j].error = 0.0;
                     for (let k = 0; k < outputs.length; k++) {
                         hidden[i][j].error += outputs[k].error * outputs[k].weights[j];
-                    }
-                    if (hidden[i][j].activation <= 0) {
-                        hidden[i][j].error = 0.0;
                     }
                 } else {
                     hidden[i][j].error = 0.0;
                     for (let k = 0; k < hidden[i + 1].length; k++) {
                         hidden[i][j].error += hidden[i + 1][k].error * hidden[i + 1][k].weights[j];
                     }
-                    if (hidden[i][j].activation <= 0) {
-                        hidden[i][j].error = 0.0;
-                    }
                 }
             }
         }
     }
-
-    function compute_value(f, x) {
+    //todo add boolean support
+    //computes the value based on the string provided by the user that defines the nn behavior
+    function compute_value(f) {
         let function_value = "";
         for (let i = 0; i < f.length; i++) {
             switch (f.charAt(i)) {
@@ -721,10 +776,52 @@
                     function_value = function_value + f.charAt(i);
             }
         }
-        if (function_value.length == 0) {
-            return x
+        if (function_value.length == 0) { //if empty string then assume goal was 0
+            return 0;
         }
-        return (x - eval(function_value));
+        return (eval(function_value));
+    }
+    
+    function adjust_network_values(batched){
+        if (batched){
+
+            for (let i = 0; i < hidden.length; i++) {
+                for (let j = 0; j < hidden[i].length; j++) {
+                    for (let k = 0; k < hidden[i][j].batch_weight_error.length; k++) {
+                        hidden[i][j].weights[k] -= lr * hidden[i][j].batch_weight_error[k] / batch_size;
+                    }
+                    hidden[i][j].bias -= lr * hidden[i][j].batch_bias_error / batch_size;
+                }
+            }
+            for (let i = 0; i < outputs.length; i++) {
+                for (let k = 0; k < outputs[i].weights.length; k++) {
+                    outputs[i].weights[k] -= lr * outputs[i].batch_weight_error[k] / batch_size;
+                }
+                outputs[i].bias -= lr * outputs[i].batch_bias_error / batch_size;
+            }
+
+        } else {
+            for (let i = 0; i < hidden.length; i++) {
+                for (let j = 0; j < hidden[i].length; j++) {
+                    if (i == 0) {
+                        for (let k = 0; k < hidden[i][j].weights.length; k++) {
+                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * features[k].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                        }
+                    } else {
+                        for (let k = 0; k < hidden[i][j].weights.length; k++) {
+                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * hidden[i - 1][j].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                        }
+                    }
+                    hidden[i][j].bias -= lr * hidden[i][j].error * activation_function.derivative_wrt_b(hidden[i][j]);
+                }
+            }
+            for (let i = 0; i < outputs.length; i++) {
+                for (let k = 0; k < outputs[i].weights.length; k++) {
+                    outputs[i].weights[k] -= lr * (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * activation_function.derivative_wrt_w(outputs[i]);
+                }
+                outputs[i].bias -= lr * outputs[i].error * activation_function.derivative_wrt_b(outputs[i]);
+            }
+        }
     }
 
 
