@@ -155,26 +155,26 @@
             <input type="range" min="1" max="50" id="num_epochs">
             <div>Batch Training</div>
             <input type="checkbox" checked id="en_batch_training">
-            <div style="display: none;">Activation Function</div>
-            <div style="display: none;"><!--todo/ when done make flex-->
+            <div>Activation Function</div>
+            <div style="display: flex;">
                 <div>
                     <div>ReLU</div>
-                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
+                    <input type="checkbox" class="activation_function_options" id="ReLU">
                 </div>
                 <div style="width:10px"></div>
                 <div>
                     <div>Leaky ReLU</div>
-                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
+                    <input type="checkbox" class="activation_function_options" id="Leaky ReLU">
                 </div>
                 <div style="width:10px"></div>
                 <div>
                     <div>GELU</div>
-                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
+                    <input type="checkbox" class="activation_function_options" id="GELU">
                 </div>
                 <div style="width:10px"></div>
                 <div>
                     <div>Sigmoid</div>
-                    <input type="checkbox" class="activation_function_options" onchange="set_activation_function()">
+                    <input type="checkbox" class="activation_function_options" id="Sigmoid">
                 </div>
             </div>
         </div>
@@ -246,6 +246,7 @@
             this.error_text.innerHTML = String(Math.round(this.error * 1000) / 1000)
         }
     }
+    
     //activation function enumeration
     const ReLU = 0;
     const LeakyReLU = 1;
@@ -258,15 +259,25 @@
         activation(n){
             switch (this.type){
                 case ReLU:
-                    n.activation += n.bias
+                    n.activation += n.bias;
                     if (n.activation <= 0){
                         return 0;
                     }
                     return n.activation;
                 case LeakyReLU:
-                    
+                    n.activation += n.bias;
+                    if (n.activation <= 0){
+                        return n.activation * .01;
+                    }
+                    return n.activation;
                 case GELU:
+                    n.activation += n.bias;
+                    let a = Math.sqrt(2 / Math.PI);
+                    let b = 0.044715 * Math.pow(n.activation, 3);
+                    return 0.5 * n.activation * (1 + Math.tanh(a * (n.activation + b)));
                 case Sigmoid:
+                    n.activation += n.bias;
+                    return 1 / (1 + Math.exp(-n.activation));
                 default:
                     return 0;
             }
@@ -284,7 +295,14 @@
                     }
                     return 1.0;
                 case GELU:
+                    const sqrt2OverPi = Math.sqrt(2 / Math.PI);
+                    const a = 0.044715;
+                    const tanhTerm = Math.tanh(sqrt2OverPi * (n.activation + a * Math.pow(n.activation, 3)));
+                    const sechTerm = Math.pow(1/Math.cosh(sqrt2OverPi * (n.activation + a * Math.pow(n.activation, 3))), 2);
+                    return (0.5 * (1 + tanhTerm) + 0.5 * n.activation * sechTerm * sqrt2OverPi * (1 + 3 * a * Math.pow(n.activation, 2)));
                 case Sigmoid:
+                    let sig = 1 / (1 + Math.exp(-n.activation));
+                    return sig * (1 - sig);
                 default:
                     return 0;
             }
@@ -296,12 +314,14 @@
                 case LeakyReLU:
                     return 1.0;
                 case GELU:
+                    return 1.0;
                 case Sigmoid:
+                    let sig = 1 / (1 + Math.exp(-n.activation));
+                    return sig * (1 - sig);
                 default:
                     return 0;
             }
         }
-
 
     }
     //global variables
@@ -360,7 +380,32 @@
             document.getElementById("num_epochs_text").innerHTML = this.value;
             num_epochs = this.value;
         }
-        
+    }
+    {
+        Array.prototype.forEach.call(document.getElementsByClassName("activation_function_options"), function(e) {
+            e.onchange = function() {
+                let tid = this.id;
+                Array.prototype.forEach.call(document.getElementsByClassName("activation_function_options"), function(element){
+                    if (tid != element.id){
+                        element.checked = false;
+                    }
+                })
+                switch (tid){
+                    case "ReLU":
+                        activation_function.type = ReLU;
+                        break;
+                    case "Leaky ReLU":
+                        activation_function.type = LeakyReLU;
+                        break;
+                    case "GELU":
+                        activation_function.type = GELU;
+                        break;
+                    case "Sigmoid":
+                        activation_function.type = Sigmoid;
+                        break;
+                }
+            }
+        })
     }
     window.onload = function () {
         //onload capture the state of the sliders
@@ -380,6 +425,30 @@
             output_functions_str += "<input class=\"textbox\" type=\"text\" id=\"textbox" + i + "\">\n"
         }
         document.getElementById("output_functions").innerHTML = output_functions_str;
+        let temp_e;
+        Array.prototype.forEach.call(document.getElementsByClassName("activation_function_options"), function(element){
+            if (element.checked){
+                switch (element.id){
+                    case "ReLU":
+                        activation_function.type = ReLU;
+                        break;
+                    case "Leaky ReLU":
+                        activation_function.type = LeakyReLU;
+                        break;
+                    case "GELU":
+                        activation_function.type = GELU;
+                        break;
+                    case "Sigmoid":
+                        activation_function.type = Sigmoid;
+                        break;
+                }
+                temp_e = element;
+                element.checked = false;
+            }
+        });
+        temp_e.checked = true;//check the only enabled function
+
+        
     };
 
     function display_info() {
@@ -545,7 +614,7 @@
         outputs.forEach(function (element) {
             element.update_text();
         })
-        let delta_x = error_graph.width / accuracy_record.length;
+        let delta_x = error_graph.width / (accuracy_record.length-1);
         let delta_y = error_graph.height / (Math.sqrt(Math.max(...accuracy_record)));
         error_graph_context.clearRect(0, 0, error_graph.width, error_graph.height);
         error_graph_context.beginPath();
