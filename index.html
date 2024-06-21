@@ -264,6 +264,7 @@
                     }
                     return n.activation;
                 case LeakyReLU:
+                    
                 case GELU:
                 case Sigmoid:
                 default:
@@ -278,6 +279,10 @@
                     }
                     return 1.0;
                 case LeakyReLU:
+                    if (n.activation <= 0){
+                        return 0.01;
+                    }
+                    return 1.0;
                 case GELU:
                 case Sigmoid:
                 default:
@@ -289,6 +294,7 @@
                 case ReLU:
                     return 1.0;
                 case LeakyReLU:
+                    return 1.0;
                 case GELU:
                 case Sigmoid:
                 default:
@@ -589,11 +595,11 @@
                         for (let j = 0; j < hidden[i].length; j++) {
                             if (i == 0) {
                                 for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * features[k].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * features[k].activation * Math.abs(hidden[i][j].weights[k]) * activation_function.derivative_wrt_w(hidden[i][j]);
                                 }
                             } else {
                                 for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * hidden[i - 1][j].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                                    hidden[i][j].batch_weight_error[k] += (hidden[i][j].error) * hidden[i - 1][j].activation * Math.abs(hidden[i][j].weights[k]) * activation_function.derivative_wrt_w(hidden[i][j]);
                                 }
                             }
                             hidden[i][j].batch_bias_error += hidden[i][j].error * activation_function.derivative_wrt_b(hidden[i][j]);
@@ -603,7 +609,7 @@
                     let current_epoch = 0.0;
                     for (let i = 0; i < outputs.length; i++) {
                         for (let k = 0; k < outputs[i].weights.length; k++) {
-                            outputs[i].batch_weight_error[k] += (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * activation_function.derivative_wrt_w(outputs[i]);
+                            outputs[i].batch_weight_error[k] += (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * Math.abs(outputs[i].weights[k]) * activation_function.derivative_wrt_w(outputs[i]);
                         }
                         outputs[i].batch_bias_error += outputs[i].error * activation_function.derivative_wrt_b(outputs[i]);
                         current_epoch += outputs[i].error ** 2;
@@ -805,11 +811,11 @@
                 for (let j = 0; j < hidden[i].length; j++) {
                     if (i == 0) {
                         for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * features[k].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * features[k].activation * hidden[i][j].weights[k] *  activation_function.derivative_wrt_w(hidden[i][j]);
                         }
                     } else {
                         for (let k = 0; k < hidden[i][j].weights.length; k++) {
-                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * hidden[i - 1][j].activation * activation_function.derivative_wrt_w(hidden[i][j]);
+                            hidden[i][j].weights[k] -= lr * (hidden[i][j].error) * hidden[i - 1][j].activation * hidden[i][j].weights[k] * activation_function.derivative_wrt_w(hidden[i][j]);
                         }
                     }
                     hidden[i][j].bias -= lr * hidden[i][j].error * activation_function.derivative_wrt_b(hidden[i][j]);
@@ -817,7 +823,7 @@
             }
             for (let i = 0; i < outputs.length; i++) {
                 for (let k = 0; k < outputs[i].weights.length; k++) {
-                    outputs[i].weights[k] -= lr * (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * activation_function.derivative_wrt_w(outputs[i]);
+                    outputs[i].weights[k] -= lr * (outputs[i].error) * (hidden[hidden.length - 1][k].activation) * outputs[i].weights[k] * activation_function.derivative_wrt_w(outputs[i]);
                 }
                 outputs[i].bias -= lr * outputs[i].error * activation_function.derivative_wrt_b(outputs[i]);
             }
