@@ -316,8 +316,7 @@
                 case GELU:
                     return 1.0;
                 case Sigmoid:
-                    let sig = 1 / (1 + Math.exp(-n.activation));
-                    return sig * (1 - sig);
+                    return 1.0;
                 default:
                     return 0;
             }
